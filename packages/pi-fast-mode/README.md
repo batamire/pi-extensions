@@ -10,7 +10,7 @@ pi install npm:@tifan/pi-fast-mode
 
 ## Usage
 
-Run `/fast` to open the list of supported models. Select a model to toggle Fast Mode. Enabled models are marked `✓`. The setting is saved per exact `provider/model` pair.
+Run `/fast` to open the list of supported models. Select a model to toggle Fast Mode. Enabled models are marked `✓`. When Fast Mode is active for the current model, the footer shows a yellow `↯` before its name. The setting is saved per exact `provider/model` pair.
 
 Run `/tps` to toggle response TPS. The setting is saved in the same configuration file.
 

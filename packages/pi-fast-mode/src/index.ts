@@ -1,10 +1,11 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs"
-import { dirname, join } from "node:path"
+import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path"
 import {
   getAgentDir,
   type ExtensionAPI,
   type ExtensionContext,
 } from "@earendil-works/pi-coding-agent"
+import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui"
 import { getAvailableFastModels, isOpenAIProvider } from "./fast-models.js"
 import { registerTps } from "./tps.js"
 
@@ -16,6 +17,10 @@ type FastConfig = {
 type Model = NonNullable<ExtensionContext["model"]>
 const CONFIG_PATH = join(getAgentDir(), "extensions", "pi-fast-mode.json")
 const DEFAULT_SERVICE_TIER = "priority"
+function formatFooterTokens(count: number): string {
+  return count < 1000 ? String(count) : `${(count / 1000).toFixed(1)}k`
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value)
 }
@@ -104,6 +109,145 @@ export default function piFastExtension(pi: ExtensionAPI): void {
     tpsEnabled = enabled
   })
 
+  function updateFastFooter(ctx: ExtensionContext): void {
+    if (
+      !ctx.model ||
+      ctx.mode !== "tui" ||
+      !isFastModel(ctx.model, enabledModels)
+    ) {
+      ctx.ui.setFooter(undefined)
+      return
+    }
+
+    ctx.ui.setFooter((tui, theme, footerData) => {
+      const unsubscribe = footerData.onBranchChange(() => tui.requestRender())
+      return {
+        dispose: unsubscribe,
+        invalidate() {},
+        render(width: number): string[] {
+          const model = ctx.model
+          if (!model) return []
+
+          let cwd = ctx.sessionManager.getCwd()
+          const home = process.env["HOME"] || process.env["USERPROFILE"]
+          if (home) {
+            const fromHome = relative(resolve(home), resolve(cwd))
+            if (
+              fromHome === "" ||
+              (fromHome !== ".." &&
+                !fromHome.startsWith(`..${sep}`) &&
+                !isAbsolute(fromHome))
+            ) {
+              cwd = fromHome === "" ? "~" : `~${sep}${fromHome}`
+            }
+          }
+          const branch = footerData.getGitBranch()
+          if (branch) cwd += ` (${branch})`
+          const sessionName = ctx.sessionManager.getSessionName()
+          if (sessionName) cwd += ` • ${sessionName}`
+
+          let input = 0
+          let output = 0
+          let cacheRead = 0
+          let cacheWrite = 0
+          let cost = 0
+          let latestCacheHitRate: number | undefined
+          for (const entry of ctx.sessionManager.getEntries()) {
+            if (
+              entry.type === "message" &&
+              entry.message.role === "assistant"
+            ) {
+              const usage = entry.message.usage
+              input += usage.input
+              output += usage.output
+              cacheRead += usage.cacheRead
+              cacheWrite += usage.cacheWrite
+              cost += usage.cost.total
+              const promptTokens =
+                usage.input + usage.cacheRead + usage.cacheWrite
+              latestCacheHitRate =
+                promptTokens > 0
+                  ? (usage.cacheRead / promptTokens) * 100
+                  : undefined
+            } else if (
+              entry.type === "message" &&
+              entry.message.role === "toolResult" &&
+              entry.message.usage
+            ) {
+              input += entry.message.usage.input
+              output += entry.message.usage.output
+              cacheRead += entry.message.usage.cacheRead
+              cacheWrite += entry.message.usage.cacheWrite
+              cost += entry.message.usage.cost.total
+            } else if (
+              (entry.type === "branch_summary" ||
+                entry.type === "compaction") &&
+              entry.usage
+            ) {
+              input += entry.usage.input
+              output += entry.usage.output
+              cacheRead += entry.usage.cacheRead
+              cacheWrite += entry.usage.cacheWrite
+              cost += entry.usage.cost.total
+            }
+          }
+
+          const stats: string[] = []
+          if (input) stats.push(`↑${formatFooterTokens(input)}`)
+          if (output) stats.push(`↓${formatFooterTokens(output)}`)
+          if (cacheRead) stats.push(`R${formatFooterTokens(cacheRead)}`)
+          if (cacheWrite) stats.push(`W${formatFooterTokens(cacheWrite)}`)
+          if (cacheRead && latestCacheHitRate !== undefined) {
+            stats.push(`CH${latestCacheHitRate.toFixed(1)}%`)
+          }
+          if (cost) stats.push(`$${cost.toFixed(3)}`)
+          const contextUsage = ctx.getContextUsage()
+          const contextWindow =
+            contextUsage?.contextWindow ?? model.contextWindow
+          const percent = contextUsage?.percent
+          stats.push(
+            percent == null
+              ? `?/${formatFooterTokens(contextWindow)}`
+              : `${percent.toFixed(1)}%/${formatFooterTokens(contextWindow)}`,
+          )
+          const statsLeft = stats.join(" ")
+
+          let right = model.id
+          if (model.reasoning) {
+            const thinkingLevel = ctx.thinkingLevel || "off"
+            right =
+              thinkingLevel === "off"
+                ? `${right} • thinking off`
+                : `${right} • ${thinkingLevel}`
+          }
+          if (footerData.getAvailableProviderCount() > 1) {
+            right = `(${model.provider}) ${right}`
+          }
+          const padding = " ".repeat(
+            Math.max(
+              1,
+              width - visibleWidth(statsLeft) - visibleWidth(right) - 2,
+            ),
+          )
+          const modelLine = truncateToWidth(
+            theme.fg("dim", statsLeft + padding) +
+              theme.fg("warning", "↯") +
+              theme.fg("dim", ` ${right}`),
+            width,
+          )
+          const statusLines = [...footerData.getExtensionStatuses().entries()]
+            .toSorted(([a], [b]) => a.localeCompare(b))
+            .map(([, text]) => text)
+          return [
+            theme.fg("dim", truncateToWidth(cwd, width)),
+            modelLine,
+            ...statusLines.map((line) => truncateToWidth(line, width)),
+          ]
+        },
+      }
+    })
+  }
+
   function loadConfig(ctx: ExtensionContext): void {
     enabledModels = new Set()
     tpsEnabled = true
@@ -119,6 +263,7 @@ export default function piFastExtension(pi: ExtensionAPI): void {
       )
     }
     setTpsEnabled(tpsEnabled, ctx)
+    updateFastFooter(ctx)
   }
 
   pi.registerCommand("fast", {
@@ -162,12 +307,21 @@ export default function piFastExtension(pi: ExtensionAPI): void {
         return
       }
 
+      updateFastFooter(ctx)
       notify(ctx, `Fast Mode ${enabled ? "enabled" : "disabled"} for ${key}.`)
     },
   })
 
   pi.on("session_start", (_event, ctx) => {
     loadConfig(ctx)
+  })
+
+  pi.on("model_select", (_event, ctx) => {
+    updateFastFooter(ctx)
+  })
+
+  pi.on("session_shutdown", (_event, ctx) => {
+    if (ctx.mode === "tui") ctx.ui.setFooter(undefined)
   })
 
   pi.on("before_provider_request", (event, ctx) => {
