@@ -139,6 +139,39 @@ function getCommandError(stdout: string, stderr: string): string {
   return stderr.trim() || stdout.trim() || "unknown error"
 }
 
+type HerdrCommandResult = {
+  code: number
+  stdout: string
+  stderr: string
+}
+
+const HERDR_AGENT_START_ATTEMPTS = 20
+const HERDR_AGENT_START_RETRY_DELAY_MS = 250
+
+export function startHerdrAgentWithRetry(
+  start: () => Promise<HerdrCommandResult>,
+): Promise<void> {
+  async function attemptStart(attempt: number): Promise<void> {
+    const result = await start()
+    if (result.code === 0) return
+
+    const error = getCommandError(result.stdout, result.stderr)
+    if (
+      !error.includes("agent_pane_busy") ||
+      attempt === HERDR_AGENT_START_ATTEMPTS - 1
+    ) {
+      throw new Error(`Could not start Pi in Herdr tab: ${error}`)
+    }
+
+    await new Promise<void>((resolve) => {
+      setTimeout(resolve, HERDR_AGENT_START_RETRY_DELAY_MS)
+    })
+    return attemptStart(attempt + 1)
+  }
+
+  return attemptStart(0)
+}
+
 async function startHandoffInHerdr(options: {
   pi: ExtensionAPI
   ctx: ExtensionCommandContext
@@ -192,33 +225,30 @@ async function startHandoffInHerdr(options: {
   const agentName = `handoff-${randomUUID().slice(0, 8)}`
   const model = options.ctx.model!
 
-  const startedAgent = await options.pi.exec(
-    "herdr",
-    [
-      "agent",
-      "start",
-      agentName,
-      "--kind",
-      "pi",
-      "--pane",
-      rootPaneId,
-      "--",
-      "--session",
-      childSessionPath,
-      "--name",
-      options.sessionName,
-      "--provider",
-      model.provider,
-      "--model",
-      model.id,
-    ],
-    { timeout: 35_000 },
+  await startHerdrAgentWithRetry(() =>
+    options.pi.exec(
+      "herdr",
+      [
+        "agent",
+        "start",
+        agentName,
+        "--kind",
+        "pi",
+        "--pane",
+        rootPaneId,
+        "--",
+        "--session",
+        childSessionPath,
+        "--name",
+        options.sessionName,
+        "--provider",
+        model.provider,
+        "--model",
+        model.id,
+      ],
+      { timeout: 35_000 },
+    ),
   )
-  if (startedAgent.code !== 0) {
-    throw new Error(
-      `Could not start Pi in Herdr tab: ${getCommandError(startedAgent.stdout, startedAgent.stderr)}`,
-    )
-  }
 
   const promptedAgent = await options.pi.exec("herdr", [
     "agent",
