@@ -5,6 +5,7 @@ import {
   type ExtensionAPI,
   type ExtensionContext,
 } from "@earendil-works/pi-coding-agent"
+import { getAvailableFastModels, isOpenAIProvider } from "./fast-models.js"
 import { registerTps } from "./tps.js"
 
 type FastConfig = {
@@ -15,21 +16,6 @@ type FastConfig = {
 type Model = NonNullable<ExtensionContext["model"]>
 const CONFIG_PATH = join(getAgentDir(), "extensions", "pi-fast-mode.json")
 const DEFAULT_SERVICE_TIER = "priority"
-const FAST_TARGETS = new Set([
-  "openai/gpt-5.4",
-  "openai/gpt-5.5",
-  "openai/gpt-5.6",
-  "openai/gpt-5.6-sol",
-  "openai/gpt-5.6-terra",
-  "openai/gpt-5.6-luna",
-  "openai-codex/gpt-5.4",
-  "openai-codex/gpt-5.5",
-  "openai-codex/gpt-5.6",
-  "openai-codex/gpt-5.6-sol",
-  "openai-codex/gpt-5.6-terra",
-  "openai-codex/gpt-5.6-luna",
-])
-
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value)
 }
@@ -98,9 +84,8 @@ function isFastModel(
   model: Model | undefined,
   enabledModels: Set<string>,
 ): boolean {
-  if (!model) return false
-  const key = modelKey(model)
-  return FAST_TARGETS.has(key) && enabledModels.has(key)
+  if (!model || !isOpenAIProvider(model.provider)) return false
+  return enabledModels.has(modelKey(model))
 }
 
 function notify(
@@ -145,7 +130,12 @@ export default function piFastExtension(pi: ExtensionAPI): void {
       }
       if (!ctx.hasUI) return
 
-      const models = [...FAST_TARGETS].toSorted()
+      const models = getAvailableFastModels(ctx.modelRegistry.getAvailable())
+      if (models.length === 0) {
+        notify(ctx, "No OpenAI models are available in Pi.")
+        return
+      }
+
       const selected = await ctx.ui.select(
         "Toggle Fast Mode:",
         models.map(

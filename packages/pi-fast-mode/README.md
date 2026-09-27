@@ -22,16 +22,7 @@ last 58 t/s · med 44 t/s | 2.1s ttft
 
 Response TPS uses Pi's provider-reported output tokens divided by the time from turn start to assistant message end. It includes reasoning tokens and response wait time. It does not include time spent executing tools.
 
-Fast Mode adds `service_tier: "priority"` for these exact models:
-
-```text
-openai/gpt-5.4             openai-codex/gpt-5.4
-openai/gpt-5.5             openai-codex/gpt-5.5
-openai/gpt-5.6             openai-codex/gpt-5.6
-openai/gpt-5.6-sol         openai-codex/gpt-5.6-sol
-openai/gpt-5.6-terra       openai-codex/gpt-5.6-terra
-openai/gpt-5.6-luna        openai-codex/gpt-5.6-luna
-```
+Fast Mode adds `service_tier: "priority"` for enabled `openai` and `openai-codex` models available in Pi. The list updates with Pi's model catalog, but OpenAI does not publish Fast Mode compatibility metadata. An unsupported model may reject the request.
 
 ## Configuration
 
@@ -39,12 +30,12 @@ Preferences are stored at `$PI_CODING_AGENT_DIR/extensions/pi-fast-mode.json`:
 
 ```json
 {
-  "models": ["openai-codex/gpt-5.6-luna"],
+  "models": ["openai-codex/gpt-6-luna"],
   "tpsEnabled": true
 }
 ```
 
-`tpsEnabled` defaults to `true` when it is missing. Unsupported models cannot be enabled.
+`tpsEnabled` defaults to `true` when it is missing. Enable Fast Mode only for models that support the `priority` service tier. Unsupported models may reject requests.
 
 ## Release notes
 
