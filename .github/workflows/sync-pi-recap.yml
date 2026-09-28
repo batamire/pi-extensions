@@ -1,0 +1,67 @@
+name: Sync pi-recap package branch
+
+# Keeps the `pkg/pi-recap` branch installable while upstream lacks the
+# opencode session header fix, then adopts upstream verbatim once it has it.
+# See VENDORED.md on `pkg/pi-recap`.
+
+on:
+  schedule:
+    - cron: "17 6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sync-pi-recap
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: pkg/pi-recap
+          fetch-depth: 0
+
+      - name: Clone upstream
+        run: git clone --depth 1 https://github.com/tifandotme/pi-extensions.git /tmp/upstream
+
+      - name: Does upstream carry the opencode session header fix?
+        id: gate
+        run: |
+          if grep -q 'x-opencode-session' /tmp/upstream/packages/pi-recap/src/index.ts; then
+            echo "adopt=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "adopt=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Adopt upstream package files
+        if: steps.gate.outputs.adopt == 'true'
+        run: |
+          set -euo pipefail
+          src=/tmp/upstream/packages/pi-recap
+          rm -rf src
+          cp -R "$src/src" src
+          cp "$src/package.json" package.json
+          cp "$src/README.md" README.md
+          # Upstream symlinks LICENSE into its monorepo root, so take the real file.
+          cp /tmp/upstream/LICENSE LICENSE
+          rm -f VENDORED.md
+
+      - name: Commit and push
+        if: steps.gate.outputs.adopt == 'true'
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "Already in sync with upstream."
+            exit 0
+          fi
+          git commit -m "chore: adopt upstream pi-recap now that it carries the opencode session header fix"
+          git push origin HEAD:pkg/pi-recap
