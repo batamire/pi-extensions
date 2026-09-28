@@ -369,6 +369,17 @@ async function generateRecap(
     clearNoModelWarning(ctx)
     showWidget(ctx, recap)
   } catch (error) {
+    // A superseded or aborted run must not report a failure in the new context.
+    // `runId` catches `agent_start`/`session_start`, which bump it before
+    // aborting; this run's own signal catches a second generation replacing it
+    // without either firing.
+    if (
+      runId !== state.runId ||
+      !state.sessionActive ||
+      abortController.signal.aborted
+    ) {
+      return
+    }
     if (options.manual) {
       clearWidget(ctx)
       const detail = error instanceof Error ? error.message : String(error)
