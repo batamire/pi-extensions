@@ -96,15 +96,6 @@
         "@earendil-works/pi-coding-agent": ">=0.84.2",
       },
     },
-    "packages/pi-review": {
-      "name": "@tifan/pi-review",
-      "version": "0.1.0",
-      "peerDependencies": {
-        "@earendil-works/pi-ai": "*",
-        "@earendil-works/pi-coding-agent": "*",
-        "@earendil-works/pi-tui": "*",
-      },
-    },
     "packages/pi-stash": {
       "name": "@tifan/pi-stash",
       "version": "0.2.0",
@@ -405,8 +396,6 @@
     "@tifan/pi-recap": ["@tifan/pi-recap@workspace:packages/pi-recap"],
 
     "@tifan/pi-rename": ["@tifan/pi-rename@workspace:packages/pi-rename"],
-
-    "@tifan/pi-review": ["@tifan/pi-review@workspace:packages/pi-review"],
 
     "@tifan/pi-stash": ["@tifan/pi-stash@workspace:packages/pi-stash"],
 
