@@ -31,7 +31,7 @@
     "provenance": true
   },
   "scripts": {
-    "test": "node --experimental-strip-types --test src/index.test.ts"
+    "test": "node --experimental-strip-types --test src/index.test.ts src/fences.test.ts"
   },
   "dependencies": {
     "grok-mermaid": "0.2.2"
