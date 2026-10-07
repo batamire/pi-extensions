@@ -1,22 +1,22 @@
 {
-  "name": "@tifan/pi-amp-footer",
+  "name": "@tifan/pi-minimal-footer",
   "version": "0.1.0",
-  "description": "Compact Amp-style footer and fixed editor for Pi.",
+  "description": "Minimal footer with model, usage, and project details for Pi.",
   "keywords": [
-    "amp",
     "footer",
+    "minimal-ui",
     "pi",
     "pi-extension",
     "pi-package"
   ],
-  "homepage": "https://github.com/tifandotme/pi-extensions/tree/master/packages/pi-amp-footer#readme",
+  "homepage": "https://github.com/tifandotme/pi-extensions/tree/master/packages/pi-minimal-footer#readme",
   "bugs": "https://github.com/tifandotme/pi-extensions/issues",
   "license": "MIT",
   "author": "Tifan Dwi Avianto <hi@tifan.me>",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/tifandotme/pi-extensions.git",
-    "directory": "packages/pi-amp-footer"
+    "directory": "packages/pi-minimal-footer"
   },
   "files": [
     "src/**/*.ts",
@@ -30,7 +30,7 @@
     "provenance": true
   },
   "scripts": {
-    "test": "node --experimental-strip-types --test src/editor-border.test.ts"
+    "test": "node --experimental-strip-types --test src/editor-border.test.ts src/footer-stats.test.ts"
   },
   "peerDependencies": {
     "@earendil-works/pi-coding-agent": ">=0.84.2",

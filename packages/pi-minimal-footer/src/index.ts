@@ -9,9 +9,14 @@ import {
 } from "@earendil-works/pi-coding-agent"
 import { stripTerminalSequences, truncateToWidth } from "@earendil-works/pi-tui"
 import type { EditorTheme, TUI } from "@earendil-works/pi-tui"
-import { formatModelBorderLabel, overlayBorderLabel } from "./editor-border.js"
+import { formatFooterStats } from "./footer-stats.js"
+import {
+  formatModelBorderLabel,
+  overlayBorderLabel,
+  overlayBorderLabels,
+} from "./editor-border.js"
 
-class AmpEditor extends CustomEditor {
+class MinimalEditor extends CustomEditor {
   override readonly embedWorkingStatus = true
 
   constructor(
@@ -67,9 +72,15 @@ class AmpEditor extends CustomEditor {
     )
     if (bottomBorder >= 0) {
       const path = projectLocation(this.ctx, footerData)
-      lines[bottomBorder] = overlayBorderLabel(
-        lines[bottomBorder] ?? "",
-        this.ctx.ui.theme.fg("dim", path),
+      const stats = formatFooterStats(
+        this.ctx.sessionManager.getEntries(),
+        this.ctx.getContextUsage(),
+        this.ctx.model?.contextWindow,
+        isUsingSubscription(this.ctx),
+      )
+      lines[bottomBorder] = overlayBorderLabels(
+        this.borderColor(stats),
+        this.borderColor(path),
         width,
         this.borderColor,
       )
@@ -118,9 +129,20 @@ export default function (pi: ExtensionAPI): void {
     ctx.ui.setFooter(createFooter(showExtensionStatus))
     ctx.ui.setEditorComponent(
       (tui, theme, keybindings) =>
-        new AmpEditor(tui, theme, keybindings, ctx, () => footerData),
+        new MinimalEditor(tui, theme, keybindings, ctx, () => footerData),
     )
   })
+}
+
+function isUsingSubscription(ctx: ExtensionContext): boolean {
+  const model = ctx.model
+  if (!model) return false
+  if (model.provider === "kimi-coding") return true
+  const provider = ctx.modelRegistry.getProvider(model.provider)
+  return (
+    ctx.modelRegistry.isUsingOAuth(model) &&
+    provider?.auth.oauth?.isSubscription === true
+  )
 }
 
 function projectLocation(

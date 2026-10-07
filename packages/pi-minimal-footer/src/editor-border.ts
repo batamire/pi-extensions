@@ -15,6 +15,25 @@ export function formatModelBorderLabel(
   return `${fastModeIcon ? `${fastModeIcon} ` : ""}${modelLabel}${thinkingLabel}`
 }
 
+export function overlayBorderLabels(
+  leftLabel: string,
+  rightLabel: string,
+  width: number,
+  borderColor: (text: string) => string,
+): string {
+  if (width < 8) return "─".repeat(width)
+
+  const labelWidth = width - 8
+  const visibleLeft = truncateToWidth(leftLabel, labelWidth, "")
+  const visibleRight = truncateToWidth(
+    rightLabel,
+    labelWidth - visibleWidth(visibleLeft),
+    "",
+  )
+  const gap = width - visibleWidth(visibleLeft) - visibleWidth(visibleRight) - 8
+  return `${borderColor("── ")}${visibleLeft}${borderColor(` ${"─".repeat(gap)} `)}${visibleRight}${borderColor(" ──")}`
+}
+
 export function overlayBorderLabel(
   border: string,
   label: string,

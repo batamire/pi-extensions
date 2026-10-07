@@ -12,7 +12,7 @@ pi install npm:@tifan/pi-fast-mode
 
 Run `/fast` or press the configured shortcut to toggle Fast Mode globally. The shortcut defaults to Amp's `speed.toggleFast` keybinding. When that setting is empty or missing, the shortcut defaults to `alt+r`.
 
-Fast Mode adds `service_tier: "priority"` to requests from supported `openai` and `openai-codex` models while enabled. When paired with `@tifan/pi-amp-footer`, the active model shows a `↯` marker.
+Fast Mode adds `service_tier: "priority"` to requests from supported `openai` and `openai-codex` models while enabled. When paired with `@tifan/pi-minimal-footer`, the active model shows a `↯` marker.
 
 Run `/tps` to toggle response TPS.
 
